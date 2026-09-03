@@ -1,0 +1,125 @@
+// Sanad-owned tables. Lives in its own Postgres schema ("sanad").
+// Platform tables are NEVER defined or migrated here — see prisma/platform.prisma (introspection only).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector, pg_trgm]
+}
+
+enum Channel {
+  WHATSAPP
+  INSTAGRAM
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum RoutePath {
+  FAST
+  AI
+  ESCALATION
+  THROTTLE
+  SYSTEM
+}
+
+enum ConversationState {
+  BOT
+  ESCALATED
+  HUMAN_TAKEOVER
+}
+
+/// One thread per (channel, external address). The external address is the
+/// only key used to scope household data — see SPEC §5.2 privacy rule.
+model Conversation {
+  id              String            @id @default(cuid())
+  channel         Channel
+  externalAddress String // e.g. "whatsapp:+14165551234" or an IG scoped user id
+  state           ConversationState @default(BOT)
+  optedOut        Boolean           @default(false)
+  lastInboundAt   DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  messages        Message[]
+  escalations     Escalation[]
+
+  @@unique([channel, externalAddress])
+  @@index([state])
+}
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      MessageDirection
+  body           String           @db.Text
+  providerSid    String?          @unique // Twilio MessageSid — idempotency key for inbound retries
+  routePath      RoutePath?
+  intent         String?
+  ttfbMs         Int? // time to first token (AI path only)
+  latencyMs      Int?
+  toolCalls      Json?
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+enum EscalationReason {
+  UNGROUNDED
+  NO_RETRIEVAL
+  KEYWORD
+  REPEATED_QUESTION
+  TOOL_ERROR
+  TIMEOUT
+}
+
+model Escalation {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  reason         EscalationReason
+  excerpt        String           @db.Text
+  assignedTo     String?
+  resolvedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@index([resolvedAt])
+}
+
+model KnowledgeDoc {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  title       String
+  category    String // "policy" | "faq" | "program" | "rules" | "venue"
+  body        String           @db.Text
+  isPublished Boolean          @default(false)
+  updatedAt   DateTime         @updatedAt
+  chunks      KnowledgeChunk[]
+}
+
+model KnowledgeChunk {
+  id        String                       @id @default(cuid())
+  docId     String
+  doc       KnowledgeDoc                 @relation(fields: [docId], references: [id], onDelete: Cascade)
+  ordinal   Int
+  content   String                       @db.Text
+  embedding Unsupported("vector(384)")?
+
+  @@index([docId])
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+}

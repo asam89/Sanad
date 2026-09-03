@@ -1,0 +1,19 @@
+# Sanad web app (Next.js) — SPEC §3 runtime layout
+[Unit]
+Description=Sanad app
+After=network.target sanad-llm-chat.service sanad-llm-embed.service
+
+[Service]
+Type=simple
+User=sanad
+Group=sanad
+WorkingDirectory=/opt/sanad
+EnvironmentFile=/etc/sanad/sanad.env
+Environment=NODE_ENV=production PORT=3100
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

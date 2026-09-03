@@ -1,0 +1,28 @@
+# Sanad self-hosted inference — embed model (SPEC §4.3)
+# Install: sudo cp deploy/systemd/sanad-llm-embed.service /etc/systemd/system/ && sudo systemctl enable --now sanad-llm-embed
+[Unit]
+Description=Sanad llama-server (embed)
+After=network.target
+
+[Service]
+Type=simple
+User=sanad
+Group=sanad
+# NEVER change --host. Loopback only.
+ExecStart=/opt/llama.cpp/build/bin/llama-server \
+  --host 127.0.0.1 --port 8083 \
+  --model /opt/models/bge-small-en-v1.5-q8_0.gguf \
+  --embedding --ctx-size 512 --threads 2 --pooling cls \
+  --log-disable
+Restart=on-failure
+RestartSec=5
+Nice=5
+MemoryMax=1G
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/models /opt/llama.cpp
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

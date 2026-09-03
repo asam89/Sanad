@@ -1,0 +1,28 @@
+# Sanad self-hosted inference — chat model (SPEC §4.3)
+# Install: sudo cp deploy/systemd/sanad-llm-chat.service /etc/systemd/system/ && sudo systemctl enable --now sanad-llm-chat
+[Unit]
+Description=Sanad llama-server (chat)
+After=network.target
+
+[Service]
+Type=simple
+User=sanad
+Group=sanad
+# NEVER change --host. Loopback only.
+ExecStart=/opt/llama.cpp/build/bin/llama-server \
+  --host 127.0.0.1 --port 8081 \
+  --model /opt/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf \
+  --ctx-size 8192 --threads 3 --parallel 2 --jinja \
+  --log-disable
+Restart=on-failure
+RestartSec=5
+Nice=5
+MemoryMax=5G
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/models /opt/llama.cpp
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
