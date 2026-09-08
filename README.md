@@ -6,7 +6,7 @@
 - Runs the program launch pipeline: product creation, registration tracking, roster export, comms dispatch, WhatsApp group handoff, Instagram publishing.
 - All inference is self-hosted on the OCI VM. No PII leaves the box.
 
-Full specification: [`docs/SPEC.md`](docs/SPEC.md). Build progress: [`docs/PROGRESS.md`](docs/PROGRESS.md).
+Full specification: [`docs/SPEC.md`](docs/SPEC.md). Build progress: [`docs/PROGRESS.md`](docs/PROGRESS.md). Run the demo on a Mac Mini: [`docs/demo-macmini.md`](docs/demo-macmini.md).
 
 ## Stack
 

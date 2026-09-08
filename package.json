@@ -16,7 +16,9 @@
     "knowledge:reindex": "tsx scripts/knowledge-reindex.ts",
     "sanad:eval": "tsx scripts/eval.ts",
     "llm:bench": "tsx scripts/llm-bench.ts",
-    "audit:whatsapp": "bash scripts/audit-whatsapp-libs.sh"
+    "audit:whatsapp": "bash scripts/audit-whatsapp-libs.sh",
+    "db:seed": "tsx prisma/seed.ts",
+    "demo:setup": "prisma migrate deploy && tsx prisma/seed.ts && tsx scripts/knowledge-reindex.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
@@ -36,5 +38,8 @@
     "tsx": "^4.19.0",
     "typescript": "^5.4.0",
     "vitest": "^2.1.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

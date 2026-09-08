@@ -12,6 +12,10 @@ export interface LocalLlamaConfig {
   chatUrl: string;
   batchUrl?: string;
   embedUrl: string;
+  /** Model names sent in the request body. llama-server ignores them; Ollama requires them. */
+  chatModel?: string;
+  batchModel?: string;
+  embedModel?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -25,8 +29,11 @@ const completionSchema = z.object({
           tool_calls: z
             .array(
               z.object({
-                id: z.string(),
-                function: z.object({ name: z.string(), arguments: z.string() }),
+                id: z.string().optional(),
+                function: z.object({
+                  name: z.string(),
+                  arguments: z.union([z.string(), z.record(z.unknown())]),
+                }),
               }),
             )
             .optional(),
@@ -51,8 +58,9 @@ function assertLoopback(url: string) {
 }
 
 /**
- * Talks to llama-server's OpenAI-compatible endpoints. Enforces that every
- * endpoint is loopback so inference never leaves the VM.
+ * Talks to an OpenAI-compatible local server (llama-server on the VM, Ollama on
+ * the Mac Mini). Enforces that every endpoint is loopback so inference never
+ * leaves the box.
  */
 export class LocalLlamaProvider implements LLMProvider {
   readonly name = "local-llama";
@@ -66,23 +74,29 @@ export class LocalLlamaProvider implements LLMProvider {
   }
 
   chat(messages: ChatMessage[], opts?: ChatOptions): Promise<ChatResult> {
-    return this.complete(this.cfg.chatUrl, messages, undefined, opts);
+    return this.complete(this.cfg.chatUrl, this.cfg.chatModel, messages, undefined, opts);
   }
 
   chatWithTools(messages: ChatMessage[], tools: ToolDefinition[], opts?: ChatOptions): Promise<ChatResult> {
-    return this.complete(this.cfg.chatUrl, messages, tools, opts);
+    return this.complete(this.cfg.chatUrl, this.cfg.chatModel, messages, tools, opts);
   }
 
   /** Same contract as chat() but routed to the larger, slower batch model. */
   chatBatch(messages: ChatMessage[], opts?: ChatOptions): Promise<ChatResult> {
-    return this.complete(this.cfg.batchUrl ?? this.cfg.chatUrl, messages, undefined, opts);
+    return this.complete(
+      this.cfg.batchUrl ?? this.cfg.chatUrl,
+      this.cfg.batchModel ?? this.cfg.chatModel,
+      messages,
+      undefined,
+      opts,
+    );
   }
 
   async embed(texts: string[]): Promise<number[][]> {
     const res = await this.fetchImpl(`${this.cfg.embedUrl}/v1/embeddings`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ input: texts }),
+      body: JSON.stringify({ input: texts, model: this.cfg.embedModel }),
     });
     if (!res.ok) throw new Error(`embed failed: HTTP ${res.status}`);
     const parsed = embeddingSchema.parse(await res.json());
@@ -91,6 +105,7 @@ export class LocalLlamaProvider implements LLMProvider {
 
   private async complete(
     baseUrl: string,
+    model: string | undefined,
     messages: ChatMessage[],
     tools: ToolDefinition[] | undefined,
     opts: ChatOptions = {},
@@ -104,6 +119,7 @@ export class LocalLlamaProvider implements LLMProvider {
         headers: { "content-type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
+          model,
           messages: messages.map(toOpenAiMessage),
           tools: tools?.map((t) => ({
             type: "function",
@@ -119,10 +135,11 @@ export class LocalLlamaProvider implements LLMProvider {
       if (!res.ok) throw new Error(`chat failed: HTTP ${res.status}`);
       const parsed = completionSchema.parse(await res.json());
       const choice = parsed.choices[0];
-      const toolCalls: ToolCall[] = (choice.message.tool_calls ?? []).map((c) => ({
-        id: c.id,
+      const toolCalls: ToolCall[] = (choice.message.tool_calls ?? []).map((c, i) => ({
+        id: c.id ?? `call_${i}`,
         name: c.function.name,
-        arguments: c.function.arguments,
+        arguments:
+          typeof c.function.arguments === "string" ? c.function.arguments : JSON.stringify(c.function.arguments),
       }));
       return {
         content: choice.message.content ?? "",
