@@ -1,0 +1,26 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run audit:whatsapp
+      - run: npm run build
+        env:
+          TWILIO_ACCOUNT_SID: ACtest
+          TWILIO_AUTH_TOKEN: test
+          TWILIO_WHATSAPP_FROM: whatsapp:+10000000000
+          SANAD_PUBLIC_URL: https://sanad.example.com

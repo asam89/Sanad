@@ -1,0 +1,14 @@
+// READ-ONLY mirror of the FaezSports platform tables Sanad needs.
+// Populated by:  npx prisma db pull --schema prisma/platform.prisma
+// NEVER run `migrate` or `db push` against this schema from this repo (SPEC §1).
+// Table list is finalised by the SPEC §2 discovery step.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/platform-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PLATFORM_DATABASE_URL")
+}
