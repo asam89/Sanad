@@ -10,11 +10,21 @@ export class PrismaConversationStore implements ConversationStore {
       update: { lastInboundAt: new Date() },
     });
 
-    const previous = await prisma.message.findFirst({
-      where: { conversationId: convo.id, direction: "INBOUND" },
-      orderBy: { createdAt: "desc" },
-      select: { body: true },
-    });
+    // Only a message we actually replied to counts as "previous" for repeat
+    // detection; ones swallowed during takeover / opt-out are not real repeats.
+    const [previous, lastOutbound] = await Promise.all([
+      prisma.message.findFirst({
+        where: { conversationId: convo.id, direction: "INBOUND" },
+        orderBy: { createdAt: "desc" },
+        select: { body: true, createdAt: true },
+      }),
+      prisma.message.findFirst({
+        where: { conversationId: convo.id, direction: "OUTBOUND" },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    const previousAnswered = previous && lastOutbound && lastOutbound.createdAt >= previous.createdAt;
 
     try {
       await prisma.message.create({
@@ -25,7 +35,7 @@ export class PrismaConversationStore implements ConversationStore {
       throw e;
     }
 
-    return { id: convo.id, state: convo.state, optedOut: convo.optedOut, previousInbound: previous?.body };
+    return { id: convo.id, state: convo.state, optedOut: convo.optedOut, previousInbound: previousAnswered ? previous.body : undefined };
   }
 
   async recordOutbound(conversationId: string, body: string, meta: { routePath: RoutePath; intent?: string }) {

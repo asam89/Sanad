@@ -61,6 +61,8 @@ describe("route()", () => {
   it("orders opt-out > escalation > repeat > fast > ai", () => {
     expect(route("STOP")).toEqual({ path: "OPT_OUT" });
     expect(route("I want a refund")).toEqual({ path: "ESCALATION", reason: "KEYWORD" });
+    expect(route("What's your refund policy?")).toEqual({ path: "FAST", intent: "refund" });
+    expect(route("how do refunds work")).toEqual({ path: "FAST", intent: "refund" });
     expect(route("when is the game", { previousInbound: "when is the game" })).toEqual({
       path: "ESCALATION",
       reason: "REPEATED_QUESTION",
@@ -196,6 +198,16 @@ describe("handleInbound", () => {
     const { deps: d2, outbound } = makeDeps({ store });
     expect(await handleInbound(inbound("hello?"), d2)).toEqual({ outcome: "paused" });
     expect(outbound.sent).toHaveLength(0);
+  });
+
+  it("stays silent after opt-out until START", async () => {
+    const { deps, store, outbound } = makeDeps();
+    store.convo.optedOut = true;
+    expect(await handleInbound(inbound("how much is it"), deps)).toEqual({ outcome: "opted_out" });
+    expect(outbound.sent).toHaveLength(0);
+    expect(await handleInbound(inbound("START"), deps)).toEqual({ outcome: "replied", path: "SYSTEM" });
+    expect(store.optedOut).toEqual([false]);
+    expect(outbound.sent).toHaveLength(1);
   });
 
   it("throttles after the per-number limit", async () => {

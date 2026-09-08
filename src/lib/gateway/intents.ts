@@ -21,7 +21,18 @@ export function classifyFastIntent(text: string): FastIntent | null {
   return null;
 }
 
-/** Explicit Tier 3 triggers; `refund` is both a fast intent and an escalation, escalation wins. */
+/**
+ * Asking *about* the refund policy is answered from the knowledge base; asking
+ * *for* a refund ("I want a refund") is a mutation request and escalates.
+ */
+const REFUND_POLICY_QUESTION =
+  /\b(refund|withdrawal|cancellation)s?\s+(policy|policies|rules|terms)\b|\bhow (do|does|are) (refunds?|withdrawals?) work\b|\bwhat('s| is| are) (your|the) (refund|withdrawal|cancellation)/i;
+
+export function isRefundPolicyQuestion(text: string): boolean {
+  return REFUND_POLICY_QUESTION.test(text);
+}
+
+/** Explicit Tier 3 triggers; `refund` is both a fast intent and an escalation, escalation wins unless it's a policy question. */
 const ESCALATION_KEYWORDS =
   /\b(refund|complaint|complain|injur(y|ed|ies)|hurt|emergency|speak to (someone|a person|a human)|talk to (someone|a person|a human)|human|real person|agent)\b/i;
 

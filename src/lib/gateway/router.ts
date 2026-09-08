@@ -1,4 +1,11 @@
-import { classifyFastIntent, hasEscalationKeyword, isOptOut, isRepeatedQuestion, type FastIntent } from "./intents";
+import {
+  classifyFastIntent,
+  hasEscalationKeyword,
+  isOptOut,
+  isRefundPolicyQuestion,
+  isRepeatedQuestion,
+  type FastIntent,
+} from "./intents";
 
 export type RouteDecision =
   | { path: "OPT_OUT" }
@@ -17,6 +24,7 @@ export interface RouteContext {
  */
 export function route(text: string, ctx: RouteContext = {}): RouteDecision {
   if (isOptOut(text)) return { path: "OPT_OUT" };
+  if (isRefundPolicyQuestion(text)) return { path: "FAST", intent: "refund" };
   if (hasEscalationKeyword(text)) return { path: "ESCALATION", reason: "KEYWORD" };
   if (isRepeatedQuestion(text, ctx.previousInbound)) return { path: "ESCALATION", reason: "REPEATED_QUESTION" };
   const intent = classifyFastIntent(text);
@@ -32,3 +40,5 @@ export const ESCALATION_REPLY =
 
 export const OPT_OUT_REPLY =
   "You have been unsubscribed from FaezSports messages. Reply START at any time to opt back in.";
+
+export const OPT_IN_REPLY = "Welcome back. You will receive FaezSports messages again. How can I help?";
