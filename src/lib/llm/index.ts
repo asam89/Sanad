@@ -15,6 +15,13 @@ export function getLLM(): LLMProvider {
   instance =
     e.LLM_PROVIDER === "mock"
       ? new MockProvider()
-      : new LocalLlamaProvider({ chatUrl: e.LLM_CHAT_URL, batchUrl: e.LLM_BATCH_URL, embedUrl: e.LLM_EMBED_URL });
+      : new LocalLlamaProvider({
+          chatUrl: e.LLM_CHAT_URL,
+          batchUrl: e.LLM_BATCH_URL,
+          embedUrl: e.LLM_EMBED_URL,
+          chatModel: e.LLM_CHAT_MODEL,
+          batchModel: e.LLM_BATCH_MODEL,
+          embedModel: e.LLM_EMBED_MODEL,
+        });
   return instance;
 }

@@ -2,15 +2,12 @@
 // Platform tables are NEVER defined or migrated here — see prisma/platform.prisma (introspection only).
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  directUrl  = env("DIRECT_URL")
-  extensions = [vector, pg_trgm]
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Channel {
@@ -105,15 +102,88 @@ model KnowledgeDoc {
   chunks      KnowledgeChunk[]
 }
 
+/// Embeddings are stored as a JSON float array and ranked in-process; the
+/// corpus is a few hundred chunks so this beats requiring pgvector on every
+/// host. Swap to pgvector when the corpus outgrows it.
 model KnowledgeChunk {
-  id        String                       @id @default(cuid())
+  id        String       @id @default(cuid())
   docId     String
-  doc       KnowledgeDoc                 @relation(fields: [docId], references: [id], onDelete: Cascade)
+  doc       KnowledgeDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
   ordinal   Int
-  content   String                       @db.Text
-  embedding Unsupported("vector(384)")?
+  content   String       @db.Text
+  embedding Json?
+  model     String? // embedding model that produced the vector
 
   @@index([docId])
+}
+
+// ---------------------------------------------------------------------------
+// Program data. On the VM this is replaced by the read-only platform mirror
+// (prisma/platform.prisma). For the Mac Mini demo Sanad owns a small copy,
+// seeded from prisma/seed.ts. Tools only ever read from these tables.
+// ---------------------------------------------------------------------------
+
+model Venue {
+  id          String    @id @default(cuid())
+  name        String
+  address     String
+  parking     String?
+  accessNotes String?
+  programs    Program[]
+}
+
+model Program {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  name            String
+  sport           String
+  ageRange        String // "9-12"
+  dayOfWeek       String // "Saturday"
+  timeOfDay       String // "10:00-11:30"
+  priceCents      Int
+  capacity        Int
+  registrationUrl String
+  startsOn        DateTime
+  isOpen          Boolean   @default(true)
+  venueId         String
+  venue           Venue     @relation(fields: [venueId], references: [id])
+  sessions        Session[]
+  registrations   Registration[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  programId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+  endsAt    DateTime
+  note      String?
+
+  @@index([programId, startsAt])
+}
+
+enum PaymentStatus {
+  PAID
+  UNPAID
+  REFUNDED
+}
+
+/// Household link: parentPhone is the WhatsApp number and the ONLY lookup key
+/// the model can use (SPEC §5.2 privacy rule).
+model Registration {
+  id             String        @id @default(cuid())
+  programId      String
+  program        Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  childFirstName String
+  childLastName  String
+  childAge       Int
+  parentName     String
+  parentPhone    String // E.164, e.g. +14165550100
+  parentEmail    String
+  paymentStatus  PaymentStatus @default(UNPAID)
+  registeredAt   DateTime      @default(now())
+
+  @@index([parentPhone])
 }
 
 model AdminUser {

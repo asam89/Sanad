@@ -1,7 +1,7 @@
 import type { Channel, EscalationReason, RoutePath } from "@prisma/client";
 import { fastReply, type FastPathSource } from "./fast-path";
 import type { RateLimiter } from "./rate-limit";
-import { ESCALATION_REPLY, OPT_OUT_REPLY, route, THROTTLE_REPLY } from "./router";
+import { ESCALATION_REPLY, OPT_IN_REPLY, OPT_OUT_REPLY, route, THROTTLE_REPLY } from "./router";
 
 /** Channel-neutral inbound shape (SPEC §6.5: WhatsApp and Instagram normalise to this). */
 export interface NormalisedInbound {
@@ -49,6 +49,7 @@ export interface HandlerDeps {
 export type HandleResult =
   | { outcome: "duplicate" }
   | { outcome: "paused" }
+  | { outcome: "opted_out" }
   | { outcome: "throttled" }
   | { outcome: "opt_out" }
   | { outcome: "replied"; path: RoutePath; intent?: string }
@@ -75,8 +76,11 @@ export async function handleInbound(msg: NormalisedInbound, deps: HandlerDeps): 
     return { outcome: "opt_out" };
   }
 
-  if (convo.optedOut && /^\s*(start|unstop|yes)\s*$/i.test(msg.body)) {
+  if (convo.optedOut) {
+    if (!/^\s*(start|unstop|yes)\s*$/i.test(msg.body)) return { outcome: "opted_out" };
     await deps.store.setOptedOut(convo.id, false);
+    await reply(OPT_IN_REPLY, "SYSTEM");
+    return { outcome: "replied", path: "SYSTEM" };
   }
 
   if (convo.state === "HUMAN_TAKEOVER") return { outcome: "paused" };
