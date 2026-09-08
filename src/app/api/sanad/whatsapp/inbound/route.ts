@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { productionDeps } from "@/lib/gateway/deps";
 import { handleInbound } from "@/lib/gateway/handle-inbound";
-import { formDataToRecord, parseInbound, redactAddress, verifyTwilioSignature } from "@/lib/gateway/twilio";
+import { formDataToRecord, inboundSchema, redactAddress, verifyTwilioSignature } from "@/lib/gateway/twilio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,12 @@ export async function POST(req: NextRequest) {
     return new NextResponse("forbidden", { status: 403 });
   }
 
-  const parsed = parseInbound(params);
+  const result = inboundSchema.safeParse(params);
+  if (!result.success) {
+    console.warn(JSON.stringify({ level: "warn", event: "twilio_bad_payload", issues: result.error.issues.map((i) => i.path.join(".")) }));
+    return new NextResponse("bad request", { status: 400 });
+  }
+  const parsed = result.data;
   if (parsed.AccountSid !== e.TWILIO_ACCOUNT_SID) return new NextResponse("forbidden", { status: 403 });
 
   console.log(
